@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>فحص أمان الروابط 🔍</title>
+
+  <style>
+    :root{
+      --bg:#f7f9fb;
+      --card:#ffffff;
+      --accent:#0b76ef;
+      --danger:#e74c3c;
+      --ok:#27ae60;
+      --muted:#6b7280;
+      --radius:12px;
+      --gap:14px;
+      font-family: "Segoe UI", Tahoma, Arial, "Noto Naskh Arabic", sans-serif;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      background:linear-gradient(180deg,#f2f6fb 0%, #fbfdff 100%);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      direction:rtl;
+    }
+
+    .wrap{
+      max-width:760px;
+      margin:36px auto;
+      padding:22px;
+    }
+
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:0 6px 22px rgba(20,30,70,0.06);
+      padding:22px;
+    }
+
+    h1{
+      margin:0 0 8px;
+      font-size:24px;
+      line-height:1.1;
+    }
+    p.lead{
+      margin:0 0 16px;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .row{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+
+    input[type="text"]{
+      flex:1 1 320px;
+      padding:12px 14px;
+      border:1px solid #e6eef9;
+      border-radius:10px;
+      font-size:15px;
+      outline:none;
+      direction:ltr; /* URLs usually LTR for nicer display */
+    }
+    input[type="text"]::placeholder{ color:#98a0b2; }
+
+    button{
+      padding:10px 14px;
+      border-radius:10px;
+      border:0;
+      background:var(--accent);
+      color:white;
+      font-weight:600;
+      cursor:pointer;
+      font-size:14px;
+    }
+    button.secondary{
+      background:#f0f4f8;
+      color:#1f2937;
+      box-shadow:none;
+    }
+    button.warn{
+      background:var(--danger);
+    }
+
+    #result{
+      margin-top:18px;
+      text-align:center;
+      font-size:16px;
+      padding:12px;
+      border-radius:10px;
+    }
+
+    .ok{ background:rgba(39,174,96,0.08); color:var(--ok); border:1px solid rgba(39,174,96,0.08); }
+    .warn{ background:rgba(231,76,60,0.07); color:var(--danger); border:1px solid rgba(231,76,60,0.07); }
+    .info{ background:rgba(11,118,239,0.06); color:var(--accent); border:1px solid rgba(11,118,239,0.06); }
+
+    .small{ font-size:13px; color:var(--muted); margin-top:8px; }
+
+    footer{ margin-top:18px; font-size:13px; color:var(--muted); text-align:center; }
+    @media (max-width:480px){
+      .wrap{ padding:14px; }
+      h1{ font-size:20px; }
+      input[type="text"]{ flex-basis:100%; }
+      .row{ flex-direction:column; gap:10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="main" aria-labelledby="title">
+      <h1 id="title">فحص أمان الروابط 🔍</h1>
+      <p class="lead">أدخل رابطاً للتحقق السريع — الصفحة متوافقة مع iOS و Android. إن كان الرابط محليًا (مثل content://) ستعطيك توجيهات.</p>
+
+      <div class="row" style="margin-top:8px;">
+        <input id="urlInput" type="text" inputmode="url" placeholder="https://example.com — أو ألصق الرابط هنا" aria-label="حقل إدخال الرابط">
+        <button id="checkBtn">فحص</button>
+        <button id="openBtn" class="secondary">فتح</button>
+        <button id="copyBtn" class="secondary">نسخ</button>
+      </div>
+
+      <div id="result" class="info small" role="status" aria-live="polite">لم يتم الفحص بعد.</div>
+
+      <div class="small" style="text-align:center; margin-top:12px;">
+        ملاحظة: هذا فحص سريع محلي (عمليات على النص). للتحقق العميق يُفضل استخدام خدمات فحص أمنية عبر الإنترنت أو رفع الرابط إلى أدوات فحص موثوقة.
+      </div>
+    </div>
+
+    <footer>مطور الويب — دعم iOS: meta viewport، avoid content://، و parsing آمن للروابط.</footer>
+  </div>
+
+  <script>
+    // عناصر
+    const urlInput = document.getElementById('urlInput');
+    const checkBtn = document.getElementById('checkBtn');
+    const openBtn  = document.getElementById('openBtn');
+    const copyBtn  = document.getElementById('copyBtn');
+    const resultEl = document.getElementById('result');
+
+    // مساعدة: تحليل الرابط مع تعامُل احتياطي (iOS قد يرفض بعض الصيغ)
+    function safeParseURL(text){
+      // إزالة مسافات طرفية
+      const s = (text||'').trim();
+      if(!s) throw new Error('empty');
+
+      // رصد content:// أو روابط محلية خاصة
+      if(s.startsWith('content://') || s.startsWith('file://') || s.startsWith('C:\\') ){
+        const e = new Error('local');
+        e.type = 'local';
+        throw e;
+      }
+
+      // بعض المستخدمين يكتبون بدون بروتوكول، نضيف http:// كخيار أول
+      try {
+        return new URL(s);
+      } catch(e){
+        try {
+          return new URL('http://' + s);
+        } catch(e2){
+          throw new Error('invalid');
+        }
+      }
+    }
+
+    function analyze(urlObj){
+      // فحص سريع: بروتوكول، دومين معروف، طول المسار، هل يحتوي استعلامات مريبّة
+      const host = urlObj.hostname || '';
+      const protocol = urlObj.protocol || '';
+      const pathname = urlObj.pathname || '';
+      const search = urlObj.search || '';
+
+      // قواعد بسيطة (تكميلية — ليست بديلاً عن فحص أمني حقيقي)
+      if(!['http:', 'https:'].includes(protocol)){
+        return {level:'warn', text:'⚠️ البروتوكول غير شائع ('+protocol+') — تحقق قبل الفتح.'};
+      }
+
+      // دومينات محلية أو غير معروفة
+      if(host.endsWith('.local') || host.endsWith('.lan') || host.includes('192.168.') || host.includes('127.0.0.1')){
+        return {level:'warn', text:'⚠️ الرابط يبدو محلياً (شبكة محلية) — تأكد أنك تقصَد ذلك.'};
+      }
+
+      // قائمة نطاقات "معروفة" بسيطة
+      const knownTlds = ['.com','.net','.org','.gov','.edu','.sa','.io','.me','.app'];
+      if(knownTlds.some(t => host.endsWith(t))){
+        // لكن نراقب إن كان هناك redirect query طويلة أو Base64 مشبوه
+        if(search.length > 200 || /base64|data:|eval\(|%3Cscript/i.test(search + pathname)){
+          return {level:'warn', text:'⚠️ الرابط يحتوي استعلامات طويلة أو أنماط مريبة — احذر.'};
+        }
+        return {level:'ok', text:'✔️ يبدو الرابط من نطاق معروف — رغم ذلك تحقق دائماً من الوجهة قبل إدخال بيانات حساسة.'};
+      }
+
+      // قياس طول host
+      if(host.length > 60 || /[^a-z0-9\.\-]/i.test(host)){
+        return {level:'warn', text:'⚠️ اسم النطاق غريب أو طويل — ربما رابط مخادع.'};
+      }
+
+      // افتراضي
+      return {level:'info', text:'ℹ️ الرابط ليس مشتبهاً بشكل واضح لكن لا توجد ثقة كاملة — تحقق من الصفحة عند الفتح.'};
+    }
+
+    function renderResult(obj, urlText){
+      resultEl.className = '';
+      if(obj.level === 'ok'){
+        resultEl.classList.add('ok');
+      } else if(obj.level === 'warn'){
+        resultEl.classList.add('warn');
+      } else {
+        resultEl.classList.add('info');
+      }
+      resultEl.innerHTML = `${obj.text}<div style="margin-top:8px;font-size:13px;color:#65788a">تحليل سريع: <strong>${escapeHtml(urlText)}</strong></div>`;
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
+    }
+
+    // أزرار
+    checkBtn.addEventListener('click', doCheck);
+    urlInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doCheck(); });
+
+    openBtn.addEventListener('click', ()=>{
+      const txt = urlInput.value.trim();
+      if(!txt) return alert('أدخل رابطاً أولاً');
+      // نتعامل مع content:// أو file://
+      if(txt.startsWith('content://') || txt.startsWith('file://')){
+        alert('الرابط يبدو محلياً (content:// أو file://). لا يمكن فتحه مباشرة عبر المتصفح هنا. إذا أردت مشاركة المحتوى، ارفع الملف إلى خدمة سحابية ثم ضع رابط HTTP/HTTPS.');
+        return;
+      }
+      // نفتح في نافذة جديدة (target=_blank)
+      let u;
+      try { u = safeParseURL(txt); }
+      catch(err){
+        if(err.type === 'local'){
+          alert('هذا رابط محلي لا يمكن فتحه من المتصفح. يرجى رفع المحتوى أو مشاركة رابط HTTP/HTTPS.');
+          return;
+        }
+        alert('الرابط غير صالح. حاول إضافة https:// في بدايته إن لزم.');
+        return;
+      }
+      // فتح آمن
+      window.open(u.href, '_blank', 'noopener,noreferrer');
+    });
+
+    copyBtn.addEventListener('click', async ()=>{
+      const txt = urlInput.value.trim();
+      if(!txt) return;
+      try {
+        await navigator.clipboard.writeText(txt);
+        copyBtn.textContent = 'تم النسخ';
+        setTimeout(()=> copyBtn.textContent = 'نسخ', 1400);
+      } catch(e){
+        // fallback
+        const ta = document.createElement('textarea'); ta.value = txt;
+        ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); copyBtn.textContent='تم النسخ'; }
+        catch(err){ alert('النسخ لم ينجح — انسخ يدوياً.'); }
+        document.body.removeChild(ta);
+        setTimeout(()=> copyBtn.textContent = 'نسخ', 1400);
+      }
+    });
+
+    function doCheck(){
+      const txt = urlInput.value.trim();
+      if(!txt){
+        resultEl.className='info';
+        resultEl.innerText = 'أدخل رابطاً ليتم فحصه.';
+        return;
+      }
+
+      // كشف الروابط المحلية (content:// من واتساب)
+      if(txt.startsWith('content://')){
+        resultEl.className='warn';
+        resultEl.innerHTML = '⚠️ هذا رابط محلي (content://) ولا يمكن الوصول إليه من المتصفح هنا. إذا أردت فحص الصفحة، ارفع الملف/الصورة إلى خدمة سحابية (مثل Google Drive أو Dropbox) أو أرسل رابط HTTP/HTTPS.';
+        return;
+      }
+
+      let u;
+      try {
+        u = safeParseURL(txt);
+      } catch(err){
+        if(err.type === 'local'){
+          resultEl.className='warn';
+          resultEl.innerText = '⚠️ الرابط يبدو محلياً ولا يمكن الوصول إليه من المتصفح.';
+          return;
+        }
+        resultEl.className='warn';
+        resultEl.innerText = '⚠️ الرابط غير صالح. جرّب إضافة https:// في البداية ثم حاول مرة أخرى.';
+        return;
+      }
+
+      // تحليل بسيط
+      const res = analyze(u);
+      renderResult(res, u.href);
+    }
+
+    // تحسين تجربة iOS: عند التركيز قم بتوسيط الحقل (يحسن من سلوك الكيبورد)
+    urlInput.addEventListener('focus', ()=> setTimeout(()=>{ urlInput.scrollIntoView({block:'center', behavior:'smooth'}); },300));
+
+    // دعم لصق تلقائي (بعض تطبيقات iOS قد تمنع التعامل المباشر)
+    (async function tryPasteOnLoad(){
+      try {
+        if(navigator.clipboard && navigator.clipboard.readText){
+          const text = await navigator.clipboard.readText();
+          if(text && text.startsWith('http')) {
+            // لا نلصق تلقائياً، فقط نعرض اقتراح
+            // يمكنك تفعيل السطر التالي لملء الحقل تلقائياً:
+            // urlInput.value = text;
+            // resultEl.innerText = 'تم اكتشاف رابط في الحافظة — اضغط فحص أو فتح.';
+            // بدلاً من ذلك نوفر اقتراحاً مرئياً:
+            // (تركناه كملاحظة حتى لا نكتب في الحقل دون إذن)
+          }
+        }
+      } catch(e){
+        // بعض المتصفحات لا تسمح بالقراءة التلقائية من الحافظة
+      }
+    })();
+
+  </script>
+</body>
+</html>
